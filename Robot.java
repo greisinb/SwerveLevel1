@@ -9,6 +9,8 @@ import com.revrobotics.CANSparkMax; //imports library for CAN controlled SparkMa
 import com.revrobotics.CANSparkMaxLowLevel.MotorType; //imports library for SmarkMax control functions (required)
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.SparkMaxPIDController;
+
+import edu.wpi.first.math.filter.SlewRateLimiter;
 import edu.wpi.first.wpilibj.Joystick;// imports a library for communicating with a joystick
 import com.ctre.phoenix.sensors.CANCoder; 
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -36,7 +38,9 @@ public class Robot extends TimedRobot {
   private CANCoder wa2Encoder; //angle encoder for front left
   private CANCoder wa3Encoder; //angle encoder for rear left
   private CANCoder wa4Encoder; //angle encoder for rear right
-  
+  public SlewRateLimiter STRLimiter;
+  public SlewRateLimiter FWDLimiter;
+  public SlewRateLimiter RCWLimiter;
 
 
 //CONSTANTS
@@ -47,9 +51,11 @@ public class Robot extends TimedRobot {
   public final double R=Math.sqrt((Math.pow(L, 2))+(Math.pow(W, 2)));
 
 //running constants
-  double dbS = .05; //deadband sensitivity 
+  double dbS = .05; //deadband sensitivity range
   double kPangle = .005; //angle motor proportional constant strength
-  
+  double kFWDLimiter =.05; //FWD slew rate limiter strength
+  double kSTRLimiter =.05; //Strafe slew rate limiter strength
+  double kRCWLimiter =.05; //Rotation slew rate limiter strength
 
   @Override
   public void robotInit() {
@@ -65,6 +71,12 @@ public class Robot extends TimedRobot {
  wa3Motor = new CANSparkMax(14, MotorType.kBrushless); //RR angle motor
  ws4Motor = new CANSparkMax(5, MotorType.kBrushless); //RL speed motor
  wa4Motor = new CANSparkMax(6, MotorType.kBrushless); //RR angle motor
+
+//Slew Rate Limiters
+FWDLimiter = new SlewRateLimiter(kFWDLimiter); //creates slew rate lmiters to modulate control inputs, strength controlled up in constants
+STRLimiter = new SlewRateLimiter(kSTRLimiter);
+RCWLimiter = new SlewRateLimiter(kRCWLimiter);
+
 
 
 
@@ -100,6 +112,12 @@ public class Robot extends TimedRobot {
     if(STR<dbS && STR >-dbS){STR=0;}
     double RCW = rotateStick.getX();
     if(RCW<dbS && RCW >-dbS){RCW=0;}
+
+//apply slew rate limiters for smoother control
+
+    FWD= FWDLimiter.calculate(FWD);
+    STR= STRLimiter.calculate(STR);
+    RCW= RCWLimiter.calculate(RCW);
 
 //compute inverse kinamatics variables
     double A= ((STR-RCW)*(L/R));
